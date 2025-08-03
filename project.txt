@@ -1,0 +1,80 @@
+Create Repo
+
+gh repo create hello-world-github --public --clone
+cd hello-world-github
+echo 'print("Hello, GitHub CI/CD!")' > hello.py
+git add .
+git commit -m "Initial Hello World"
+git push origin main
+
+
+cd ~
+mkdir actions-runner && cd actions-runner
+curl -o actions-runner-osx-arm64-2.321.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-osx-arm64-2.321.0.tar.gz
+tar xzf ./actions-runner-osx-arm64-2.321.0.tar.gz
+./config.sh --url https://github.com/<your-user>/hello-world-github --token <TOKEN_FROM_GITHUB>
+./run.sh
+
+
+Add GitHub Actions Workflow
+
+.github/workflows/ci.yml
+
+name: Hello World CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 hello.py
+      - run: zip hello.zip hello.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hello-artifact
+          path: hello.zip
+
+  docker-build-and-push:
+    runs-on: self-hosted
+    needs: build-test
+    environment: staging
+    env:
+      REGISTRY: localhost:5001
+      IMAGE_NAME: hello-world
+      IMAGE_TAG: latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to Nexus
+        run: echo "${{ secrets.NEXUS_PASSWORD }}" | docker login $REGISTRY -u ${{ secrets.NEXUS_USERNAME }} --password-stdin
+      - name: Build Docker image
+        run: docker build -t $REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
+      - name: Push Docker image
+        run: docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+
+  deploy-local:
+    runs-on: self-hosted
+    needs: docker-build-and-push
+    steps:
+      - name: Stop old container
+        run: docker rm -f hello-world || true
+      - name: Run container locally
+        run: docker run -d --name hello-world -p 8083:80 localhost:5001/hello-world:latest
+
+
+git add .github/workflows/ci.yml
+git commit -m "Add CI pipeline"
+git push origin main
+
+git push origin main
+error: src refspec main does not match any
+
+git branch -M main
+git push -u origin main
+
+
+
